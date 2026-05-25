@@ -1,0 +1,191 @@
+-- // AIMBOT BÁM ĐẦU + FLY + SPIN (Free Fire Style) //
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local aimbotEnabled = true
+local flyEnabled = false
+local spinning = false
+
+-- Cài đặt
+local smoothness = 0.45          -- Càng nhỏ aim càng mạnh
+local fovRadius = 900
+local spinSpeed = 35             -- Tốc độ xoay (tăng để xoay nhanh hơn)
+
+-- ================== TÂM CỐ ĐỊNH ==================
+local crosshair = Drawing.new("Circle")
+crosshair.Color = Color3.fromRGB(0, 255, 255)
+crosshair.Thickness = 2
+crosshair.Radius = 14
+crosshair.Transparency = 1
+crosshair.Visible = true
+crosshair.Filled = false
+
+local crosshairDot = Drawing.new("Circle")
+crosshairDot.Color = Color3.fromRGB(255, 0, 0)
+crosshairDot.Radius = 3
+crosshairDot.Transparency = 1
+crosshairDot.Visible = true
+crosshairDot.Filled = true
+
+RunService.RenderStepped:Connect(function()
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    crosshair.Position = center
+    crosshairDot.Position = center
+end)
+
+-- ================== FLY + SPIN ==================
+local flyBodyVelocity = nil
+local spinConnection = nil
+
+local function startFlyAndSpin()
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local root = character.HumanoidRootPart
+    local hum = character:FindFirstChild("Humanoid")
+    
+    if hum then hum.PlatformStand = true end
+    
+    -- Fly
+    flyBodyVelocity = Instance.new("BodyVelocity")
+    flyBodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    flyBodyVelocity.Velocity = Vector3.new(0,0,0)
+    flyBodyVelocity.Parent = root
+    
+    -- Spin
+    spinning = true
+    if spinConnection then spinConnection:Disconnect() end
+    spinConnection = RunService.RenderStepped:Connect(function(dt)
+        if not spinning or not root then return end
+        root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0)
+    end)
+end
+
+local function stopFlyAndSpin()
+    spinning = false
+    if spinConnection then spinConnection:Disconnect() spinConnection = nil end
+    
+    if flyBodyVelocity then 
+        flyBodyVelocity:Destroy() 
+        flyBodyVelocity = nil 
+    end
+    
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("Humanoid") then
+        character.Humanoid.PlatformStand = false
+    end
+end
+
+-- Toggle F
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        flyEnabled = not flyEnabled
+        if flyEnabled then
+            startFlyAndSpin()
+            print("🟢 FLY + SPIN BẬT")
+        else
+            stopFlyAndSpin()
+            print("🔴 FLY + SPIN TẮT")
+        end
+    end
+end)
+
+-- Điều khiển bay
+RunService.RenderStepped:Connect(function()
+    if not flyEnabled or not flyBodyVelocity then return end
+    local move = Vector3.new(0,0,0)
+    local cam = Camera
+    
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then move -= Vector3.new(0,1,0) end
+   
+    if move.Magnitude > 0 then 
+        move = move.Unit * 85 
+    end
+    flyBodyVelocity.Velocity = move
+end)
+
+-- ================== AIMBOT BÁM ĐẦU (Chỉ khi bắn) ==================
+local currentTarget = nil
+
+local function getClosestPlayer()
+    local closest, dist = nil, fovRadius
+    local mousePos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local head = player.Character:FindFirstChild("Head")
+            local hum = player.Character:FindFirstChild("Humanoid")
+            
+            if head and hum and hum.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                    if distance < dist then
+                        dist = distance
+                        closest = player
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+RunService.RenderStepped:Connect(function()
+    if not aimbotEnabled then return end
+    
+    -- Chỉ aim khi đang bắn (giữ chuột trái)
+    if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+        currentTarget = nil
+        return
+    end
+
+    if not currentTarget or not currentTarget.Character or not currentTarget.Character:FindFirstChild("Head") then
+        currentTarget = getClosestPlayer()
+    end
+
+    if currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("Head") then
+        local head = currentTarget.Character.Head
+        local hum = currentTarget.Character:FindFirstChild("Humanoid")
+        
+        if hum and hum.Health <= 0 then
+            currentTarget = nil
+            return
+        end
+
+        local currentCFrame = Camera.CFrame
+        local targetCFrame = CFrame.lookAt(currentCFrame.Position, head.Position + Vector3.new(0, 0.1, 0))
+        
+        Camera.CFrame = currentCFrame:Lerp(targetCFrame, smoothness)
+    end
+end)
+local keys = {
+    "BAODUY",
+    "TUANKIET",
+    "PRE300",
+    "ZENIX_202",
+    "snowshop"
+}
+
+local valid = false
+
+for _,v in pairs(keys) do
+    if getgenv().Key == v then
+        valid = true
+        break
+    end
+end
+
+if not valid then
+    return
+end
+print("✅ AIMBOT BÁM ĐẦU + FLY + SPIN ĐÃ SẴN SÀNG!")
