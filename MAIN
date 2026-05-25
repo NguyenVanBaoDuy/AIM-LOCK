@@ -1,3 +1,25 @@
+local keys = {
+    "BAODUY",
+    "TUANKIET",
+    "PRE300",
+    "ZENIX_202",
+    "snowshop"
+}
+
+local valid = false
+
+for _,v in pairs(keys) do
+    if getgenv().Key == v then
+        valid = true
+        break
+    end
+end
+
+if not valid then
+    game.Players.LocalPlayer:Kick("KEY SAI HOẶC KHÔNG ĐÚNG")
+    return
+end
+
 -- // AIMBOT BÁM ĐẦU + FLY + SPIN (Free Fire Style) //
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -168,24 +190,5 @@ RunService.RenderStepped:Connect(function()
         Camera.CFrame = currentCFrame:Lerp(targetCFrame, smoothness)
     end
 end)
-local keys = {
-    "BAODUY",
-    "TUANKIET",
-    "PRE300",
-    "ZENIX_202",
-    "snowshop"
-}
 
-local valid = false
-
-for _,v in pairs(keys) do
-    if getgenv().Key == v then
-        valid = true
-        break
-    end
-end
-
-if not valid then
-    return
-end
 print("✅ AIMBOT BÁM ĐẦU + FLY + SPIN ĐÃ SẴN SÀNG!")
